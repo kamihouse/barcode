@@ -3,6 +3,8 @@ var barcode = function() {
 	var video = null;
 	var canvas = null;
 	var ctx = null;	
+	var canvasg = null;
+	var ctxg = null;	
 	var localMediaStream = null;
 	var height = 0;
 	var width = 0;
@@ -26,14 +28,20 @@ var barcode = function() {
 		strokeColor: '#f00',
 		start: 0.05,
 		end: 0.95,
-		threshold: 160
+		threshold: 160,
+		video: '',
+		canvas: '',
+		canvasg: '', 
+		result: ''
+	}
+
+	function writeResult(result) {
+		$(config.result).html(result);		
 	}
 
 	function snapshot() {
 		ctx.drawImage(video, 0, 0, width, height);
 		getPixels();		
-		drawGraphics();
-		document.querySelector('#barcode_img').src = canvas.toDataURL('image/webp');
 	}
 
 	function getPixels() {
@@ -125,12 +133,9 @@ var barcode = function() {
 					}
 				}
 				console.log(keys);
-				console.log(digits.join(''));
-				
+				writeResult(digits.join(''));
 			} else {
 				console.log('reference sequence error');
-				console.log(startSeq);
-				console.log(midSeq);
 			}
 
 		} else {
@@ -140,25 +145,30 @@ var barcode = function() {
 	}	
 
 	function drawGraphics() {
-		ctx.strokeStyle = config.strokeColor;
-		ctx.lineWidth = 3;
-		ctx.beginPath();
-		ctx.moveTo(start, height * 0.5);
-		ctx.lineTo(end, height * 0.5);
-		ctx.stroke();
+		ctxg.strokeStyle = config.strokeColor;
+		ctxg.lineWidth = 3;
+		ctxg.beginPath();
+		ctxg.moveTo(start, height * 0.5);
+		ctxg.lineTo(end, height * 0.5);
+		ctxg.stroke();
 	}
 
-	function init(element) {
+	function init(videoElement, canvasElement, canvasElementG, resultElement) {
 
-		$(element).html('<video id="barcode_video" autoplay></video><img id="barcode_img" src=""><canvas id="barcode_canvas" style="display: none;"></canvas>');
+		config.video = videoElement;
+		config.canvas = canvasElement;
+		config.result = resultElement;
+		config.canvasg = canvasElementG;
 
 		window.URL = window.URL || window.webkitURL;
 		navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 
-		video = document.querySelector('#barcode_video');
+		video = document.querySelector(config.video);
 		video.addEventListener('click', snapshot, false);
-		canvas = document.querySelector('#barcode_canvas');
+		canvas = document.querySelector(config.canvas);
 		ctx = canvas.getContext('2d');
+		canvasg = document.querySelector(config.canvasg);
+		ctxg = canvasg.getContext('2d');
 
 		if (navigator.getUserMedia) {
 			navigator.getUserMedia({audio: false, video: true}, function(stream) {
@@ -173,9 +183,12 @@ var barcode = function() {
 			end = width * config.end;
 			canvas.width = width;
 			canvas.height = height;
+			canvasg.width = width;
+			canvasg.height = height;
 			console.log('canplay event');
+			setInterval(function(){snapshot()}, 1000);
+			drawGraphics();
 		}, false);
-
 	}
 
 	return {

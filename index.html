@@ -7,14 +7,19 @@
 
 <script type="text/javascript">
 $(document).ready(function() {
-	barcode.init('#bc');
+	barcode.init('#barcodevideo', '#barcodecanvas', '#barcodecanvasg', '#result');
 });
 </script>
 
 </head>
 <body>
 
-<div id="bc"></div>
+<div id="barcode">
+	<video id="barcodevideo" autoplay></video>
+	<canvas id="barcodecanvasg" ></canvas>
+</div>
+<canvas id="barcodecanvas" ></canvas>
+<div id="result"></div>
 
 </body>
 </html>
