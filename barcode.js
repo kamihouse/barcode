@@ -27,11 +27,11 @@ var barcode = function() {
 
 	var config = {
 		strokeColor: '#f00',
-		start: 0.05,
-		end: 0.95,
+		start: 0.1,
+		end: 0.9,
 		threshold: 160,
 		quality: 0.45,
-		delay: 300,
+		delay: 100,
 		video: '',
 		canvas: '',
 		canvasg: '', 
@@ -78,12 +78,12 @@ var barcode = function() {
 			}
 		}
 		
-		// bars
+		// determine bar widths
 
-		var current = 0;
+		var current = binary[0];
 		var count = 0;
 
-		for (var i = binary.indexOf(0), ii = binary.length; i < ii; i++) {
+		for (var i = 0, ii = binary.length; i < ii; i++) {
 			if (binary[i] == current) {
 				count++;
 			} else {
@@ -94,6 +94,37 @@ var barcode = function() {
 		}
 		pixelbars.push(count);
 
+		// quality check
+
+		if (pixelbars.length < (3 + 24 + 5 + 24 + 3 + 1)) {
+			return;
+		}
+
+		// find starting sequence
+
+		var startIndex = 0;
+		var minFactor = 0.5;
+		var maxFactor = 1.5;
+
+		for (var i = 3, ii = pixelbars.length; i < ii; i++) {
+			var refLength = (pixelbars[i] + pixelbars[i-1] + pixelbars[i-2]) / 3;
+			if (
+				(pixelbars[i] > (minFactor * refLength) || pixelbars[i] < (maxFactor * refLength))
+				&& (pixelbars[i-1] > (minFactor * refLength) || pixelbars[i-1] < (maxFactor * refLength))
+				&& (pixelbars[i-2] > (minFactor * refLength) || pixelbars[i-2] < (maxFactor * refLength))
+				&& (pixelbars[i-3] > 3 * refLength)
+			) {
+				startIndex = i - 2;
+				break;
+			}
+		}
+
+		if (startIndex == 0) {
+			return;
+		}
+
+		pixelbars = pixelbars.slice(startIndex, startIndex + 3 + 24 + 5 + 24 + 3);
+
 		// calculate relative widths
 
 		var ref = (pixelbars[0] + pixelbars[1] + pixelbars[2]) / 3;
@@ -102,12 +133,9 @@ var barcode = function() {
 			bars.push(Math.round(pixelbars[i] / ref * 100) / 100);
 		}
 
-		// quality check
+		// analyze pattern
 
-		if (bars.length == (3 + 24 + 5 + 24 + 3 + 1)) {
-			bars.pop();
-			analyze();
-		}
+		analyze();
 
 	}	
 
@@ -177,7 +205,6 @@ var barcode = function() {
 			digits[i] = parityCheck(digits[i]);
 		}		
 				
-
 		// identify digits
 		
 		var result = [];	
@@ -259,5 +286,22 @@ var barcode = function() {
 	return {
 		init: init
 	};
+
+	// debugging utilities
+
+	function drawBars(binary) {
+		for (var i = 0, ii = binary.length; i < ii; i++) {
+			if (binary[i] == 1) {
+				ctxg.strokeStyle = '#fff';
+			} else {
+				ctxg.strokeStyle = '#000';
+			}
+			ctxg.lineWidth = 3;
+			ctxg.beginPath();
+			ctxg.moveTo(start + i, height * 0.5);
+			ctxg.lineTo(start + i + 1, height * 0.5);
+			ctxg.stroke();
+		}
+	}
 
 }();
