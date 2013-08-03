@@ -6,9 +6,18 @@
 <script type="text/javascript" src="barcode.js"></script>
 
 <script type="text/javascript">
+
+var sound = new Audio("barcode.wav");
+
 $(document).ready(function() {
 	barcode.init('#barcodevideo', '#barcodecanvas', '#barcodecanvasg', '#result');
+
+	$('#result').bind('DOMSubtreeModified', function(e) {
+		sound.play();	
+	});
+
 });
+
 </script>
 
 </head>
