@@ -12,6 +12,12 @@ var barcode = function() {
 	var end = 0;
 	var bars = [];
 
+	var handler = null;
+
+	function setHandler(h) {
+		handler = h;
+	}
+
 	var upc = {
 		'0': [3, 2, 1, 1],
 		'1': [2, 2, 2, 1],
@@ -48,11 +54,6 @@ var barcode = function() {
 		video: '',
 		canvas: '',
 		canvasg: '', 
-		result: ''
-	}
-
-	function writeResult(result) {
-		$(config.result).html(result);		
 	}
 
 	function snapshot() {
@@ -252,7 +253,9 @@ var barcode = function() {
 		// output
 
 		if(quality < config.quality) {
-			writeResult(checkDigit + result.join(''));
+			if (handler != null) {
+				handler(checkDigit + result.join(''));
+			}
 		}
 
 	}
@@ -266,12 +269,7 @@ var barcode = function() {
 		ctxg.stroke();
 	}
 
-	function init(videoElement, canvasElement, canvasElementG, resultElement) {
-
-		config.video = videoElement;
-		config.canvas = canvasElement;
-		config.result = resultElement;
-		config.canvasg = canvasElementG;
+	function init() {
 
 		window.URL = window.URL || window.webkitURL;
 		navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
@@ -304,7 +302,9 @@ var barcode = function() {
 	}
 
 	return {
-		init: init
+		init: init,
+		setHandler: setHandler,
+		config: config
 	};
 
 	// debugging utilities
