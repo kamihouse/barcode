@@ -25,6 +25,19 @@ var barcode = function() {
 		'9': [3, 1, 1, 2]
 	};
 
+	var check = {
+		'oooooo': '0',
+		'ooeoee': '1',
+		'ooeeoe': '2',
+		'ooeeeo': '3',
+		'oeooee': '4',
+		'oeeooe': '5',
+		'oeeeoo': '6',
+		'oeoeoe': '7',
+		'oeoeeo': '8',
+		'oeeoeo': '9'
+	}
+
 	var config = {
 		strokeColor: '#f00',
 		start: 0.1,
@@ -165,12 +178,8 @@ var barcode = function() {
 		return distance;
 	}
 
-	function parityCheck(digit) {
-		if (!isOdd(Math.round(digit[1] + digit[3]))) {
-			return digit.reverse();
-		} else {
-			return digit;
-		}
+	function parity(digit) {
+		return isOdd(Math.round(digit[1] + digit[3]));
 	}
 	
 	function analyze() {
@@ -201,8 +210,15 @@ var barcode = function() {
 
 		// determine parity and reverse if necessary
 
+		var parities = [];
+
 		for (var i = 0; i < 6; i++) {
-			digits[i] = parityCheck(digits[i]);
+			if (parity(digits[i])) {
+				parities.push('o');
+			} else {
+				parities.push('e');
+				digits[i] = digits[i].reverse();
+			}
 		}		
 				
 		// identify digits
@@ -229,10 +245,14 @@ var barcode = function() {
 		
 		}		
 
+		// check digit
+		
+		var checkDigit = check[parities.join('')];
+
 		// output
 
 		if(quality < config.quality) {
-			writeResult(result.join(''));
+			writeResult(checkDigit + result.join(''));
 		}
 
 	}
