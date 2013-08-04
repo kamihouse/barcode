@@ -1,21 +1,22 @@
 var barcode = function() {
 
-	var video = null;
-	var canvas = null;
-	var ctx = null;	
-	var canvasg = null;
-	var ctxg = null;	
 	var localMediaStream = null;
-	var height = 0;
-	var width = 0;
-	var start = 0;
-	var end = 0;
 	var bars = [];
-
 	var handler = null;
 
-	function setHandler(h) {
-		handler = h;
+	var dimensions = {
+		height: 0,
+		width: 0,
+		start: 0,
+		end: 0
+	}
+
+	var elements = {
+		video: null,
+		canvas: null,
+		ctx: null,	
+		canvasg: null,
+		ctxg: null	
 	}
 
 	var upc = {
@@ -53,26 +54,61 @@ var barcode = function() {
 		delay: 100,
 		video: '',
 		canvas: '',
-		canvasg: '', 
+		canvasg: ''
+	}
+
+	function init() {
+
+		window.URL = window.URL || window.webkitURL;
+		navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+		elements.video = document.querySelector(config.video);
+		elements.canvas = document.querySelector(config.canvas);
+		elements.ctx = elements.canvas.getContext('2d');
+		elements.canvasg = document.querySelector(config.canvasg);
+		elements.ctxg = elements.canvasg.getContext('2d');
+
+		if (navigator.getUserMedia) {
+			navigator.getUserMedia({audio: false, video: true}, function(stream) {
+				elements.video.src = window.URL.createObjectURL(stream);
+			});
+		}
+
+		elements.video.addEventListener('canplay', function(e) {
+
+			dimensions.height = elements.video.videoHeight;
+			dimensions.width = elements.video.videoWidth;
+
+			dimensions.start = dimensions.width * config.start;
+			dimensions.end = dimensions.width * config.end;
+
+			elements.canvas.width = dimensions.width;
+			elements.canvas.height = dimensions.height;
+			elements.canvasg.width = dimensions.width;
+			elements.canvasg.height = dimensions.height;
+
+			drawGraphics();
+			setInterval(function(){snapshot()}, config.delay);
+
+		}, false);
 	}
 
 	function snapshot() {
-		timerStart = new Date().getTime();
-		ctx.drawImage(video, 0, 0, width, height);
+		elements.ctx.drawImage(elements.video, 0, 0, dimensions.width, dimensions.height);
 		processImage();		
 	}
 
 	function processImage() {
 
+		bars = [];
+
 		var pixels = [];
 		var binary = [];
-		var pixelbars = [];
-
-		bars = [];
+		var pixelBars = [];
 
 		// convert to grayscale
  
-		var imgd = ctx.getImageData(start, height * 0.5, end - start, 1);
+		var imgd = elements.ctx.getImageData(dimensions.start, dimensions.height * 0.5, dimensions.end - dimensions.start, 1);
 		var rgbpixels = imgd.data;
 
 		for (var i = 0, ii = rgbpixels.length; i < ii; i = i + 4) {
@@ -101,16 +137,16 @@ var barcode = function() {
 			if (binary[i] == current) {
 				count++;
 			} else {
-				pixelbars.push(count);
+				pixelBars.push(count);
 				count = 1;
 				current = binary[i]
 			}
 		}
-		pixelbars.push(count);
+		pixelBars.push(count);
 
 		// quality check
 
-		if (pixelbars.length < (3 + 24 + 5 + 24 + 3 + 1)) {
+		if (pixelBars.length < (3 + 24 + 5 + 24 + 3 + 1)) {
 			return;
 		}
 
@@ -120,31 +156,35 @@ var barcode = function() {
 		var minFactor = 0.5;
 		var maxFactor = 1.5;
 
-		for (var i = 3, ii = pixelbars.length; i < ii; i++) {
-			var refLength = (pixelbars[i] + pixelbars[i-1] + pixelbars[i-2]) / 3;
+		for (var i = 3, ii = pixelBars.length; i < ii; i++) {
+			var refLength = (pixelBars[i] + pixelBars[i-1] + pixelBars[i-2]) / 3;
 			if (
-				(pixelbars[i] > (minFactor * refLength) || pixelbars[i] < (maxFactor * refLength))
-				&& (pixelbars[i-1] > (minFactor * refLength) || pixelbars[i-1] < (maxFactor * refLength))
-				&& (pixelbars[i-2] > (minFactor * refLength) || pixelbars[i-2] < (maxFactor * refLength))
-				&& (pixelbars[i-3] > 3 * refLength)
+				(pixelBars[i] > (minFactor * refLength) || pixelBars[i] < (maxFactor * refLength))
+				&& (pixelBars[i-1] > (minFactor * refLength) || pixelBars[i-1] < (maxFactor * refLength))
+				&& (pixelBars[i-2] > (minFactor * refLength) || pixelBars[i-2] < (maxFactor * refLength))
+				&& (pixelBars[i-3] > 3 * refLength)
 			) {
 				startIndex = i - 2;
 				break;
 			}
 		}
 
+		// return if no starting sequence found
+
 		if (startIndex == 0) {
 			return;
 		}
 
-		pixelbars = pixelbars.slice(startIndex, startIndex + 3 + 24 + 5 + 24 + 3);
+		// discard leading and trailing patterns
+
+		pixelBars = pixelBars.slice(startIndex, startIndex + 3 + 24 + 5 + 24 + 3);
 
 		// calculate relative widths
 
-		var ref = (pixelbars[0] + pixelbars[1] + pixelbars[2]) / 3;
+		var ref = (pixelBars[0] + pixelBars[1] + pixelBars[2]) / 3;
 		
-		for (var i = 0, ii = pixelbars.length; i < ii; i++) {
-			bars.push(Math.round(pixelbars[i] / ref * 100) / 100);
+		for (var i = 0, ii = pixelBars.length; i < ii; i++) {
+			bars.push(Math.round(pixelBars[i] / ref * 100) / 100);
 		}
 
 		// analyze pattern
@@ -153,36 +193,6 @@ var barcode = function() {
 
 	}	
 
-	function normalize(input, total) {
-		var sum = 0;
-		var result = [];
-		for (var i = 0, ii = input.length; i < ii; i++) {
-			sum = sum + input[i];
-		}
-		for (var i = 0, ii = input.length; i < ii; i++) {
-			result.push(input[i] / sum * total);
-		}
-		return result;
-	}
-
-	function isOdd(num) { 
-		return num % 2;
-	}
-
-	function maxDistance(a, b) {
-		var distance = 0;
-		for (var i = 0, ii = a.length; i < ii; i++) {
-			if (Math.abs(a[i] - b[i]) > distance) {
-				distance = Math.abs(a[i] - b[i]);
-			}
-		}
-		return distance;
-	}
-
-	function parity(digit) {
-		return isOdd(Math.round(digit[1] + digit[3]));
-	}
-	
 	function analyze() {
 
 		// determine parity first digit and reverse sequence if necessary
@@ -192,7 +202,7 @@ var barcode = function() {
 			bars = bars.reverse();
 		}
 
-		// split
+		// split into digits
 
 		var digits = [
 			normalize(bars.slice(3, 3 + 4), 7),
@@ -260,45 +270,47 @@ var barcode = function() {
 
 	}
 
-	function drawGraphics() {
-		ctxg.strokeStyle = config.strokeColor;
-		ctxg.lineWidth = 3;
-		ctxg.beginPath();
-		ctxg.moveTo(start, height * 0.5);
-		ctxg.lineTo(end, height * 0.5);
-		ctxg.stroke();
+	function setHandler(h) {
+		handler = h;
 	}
 
-	function init() {
-
-		window.URL = window.URL || window.webkitURL;
-		navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-
-		video = document.querySelector(config.video);
-		video.addEventListener('click', snapshot, false);
-		canvas = document.querySelector(config.canvas);
-		ctx = canvas.getContext('2d');
-		canvasg = document.querySelector(config.canvasg);
-		ctxg = canvasg.getContext('2d');
-
-		if (navigator.getUserMedia) {
-			navigator.getUserMedia({audio: false, video: true}, function(stream) {
-				video.src = window.URL.createObjectURL(stream);
-			});
+	function normalize(input, total) {
+		var sum = 0;
+		var result = [];
+		for (var i = 0, ii = input.length; i < ii; i++) {
+			sum = sum + input[i];
 		}
+		for (var i = 0, ii = input.length; i < ii; i++) {
+			result.push(input[i] / sum * total);
+		}
+		return result;
+	}
 
-		video.addEventListener('canplay', function(e) {
-			height = video.videoHeight;
-			width = video.videoWidth;
-			start = width * config.start;
-			end = width * config.end;
-			canvas.width = width;
-			canvas.height = height;
-			canvasg.width = width;
-			canvasg.height = height;
-			setInterval(function(){snapshot()}, config.delay);
-			drawGraphics();
-		}, false);
+	function isOdd(num) { 
+		return num % 2;
+	}
+
+	function maxDistance(a, b) {
+		var distance = 0;
+		for (var i = 0, ii = a.length; i < ii; i++) {
+			if (Math.abs(a[i] - b[i]) > distance) {
+				distance = Math.abs(a[i] - b[i]);
+			}
+		}
+		return distance;
+	}
+
+	function parity(digit) {
+		return isOdd(Math.round(digit[1] + digit[3]));
+	}
+	
+	function drawGraphics() {
+		elements.ctxg.strokeStyle = config.strokeColor;
+		elements.ctxg.lineWidth = 3;
+		elements.ctxg.beginPath();
+		elements.ctxg.moveTo(dimensions.start, dimensions.height * 0.5);
+		elements.ctxg.lineTo(dimensions.end, dimensions.height * 0.5);
+		elements.ctxg.stroke();
 	}
 
 	return {
@@ -312,15 +324,15 @@ var barcode = function() {
 	function drawBars(binary) {
 		for (var i = 0, ii = binary.length; i < ii; i++) {
 			if (binary[i] == 1) {
-				ctxg.strokeStyle = '#fff';
+				elements.ctxg.strokeStyle = '#fff';
 			} else {
-				ctxg.strokeStyle = '#000';
+				elements.ctxg.strokeStyle = '#000';
 			}
-			ctxg.lineWidth = 3;
-			ctxg.beginPath();
-			ctxg.moveTo(start + i, height * 0.5);
-			ctxg.lineTo(start + i + 1, height * 0.5);
-			ctxg.stroke();
+			elements.ctxg.lineWidth = 3;
+			elements.ctxg.beginPath();
+			elements.ctxg.moveTo(start + i, height * 0.5);
+			elements.ctxg.lineTo(start + i + 1, height * 0.5);
+			elements.ctxg.stroke();
 		}
 	}
 
